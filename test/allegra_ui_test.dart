@@ -1,17 +1,17 @@
-import 'package:allegra_ui/models/layout_manager.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:allegra_ui/allegra_ui.dart';
 
 void main() {
-  test('adds one to input values', () {
+  test('adds tab and remove tab', () {
     final layoutManager = LayoutManager();
 
-    expect(layoutManager.tabs.length, 0);
-    layoutManager.addTab(TabPanel(title: 'title', page: Placeholder()));
-    // expect(calculator.addOne(-7), -6);
-    // expect(calculator.addOne(0), 1);
+    expect(layoutManager.tabPanels.length, 0);
+    final tabPanel = TabPanel(title: 'title', page: Placeholder());
+    layoutManager.addTab(tabPanel);
+    expect(layoutManager.tabPanels.length, 1);
+    layoutManager.removeTab(tabPanel);
+    expect(layoutManager.tabPanels.length, 0);
   });
 }
