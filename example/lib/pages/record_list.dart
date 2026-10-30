@@ -4,16 +4,12 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:allegra_ui/allegra_ui.dart';
 import 'package:provider/provider.dart';
+import 'package:example/models/sales.dart';
 
-class RecordList extends StatefulWidget {
-  const RecordList({super.key});
+class RecordList extends StatelessWidget {
+  RecordList({super.key});
 
-  @override
-  State<RecordList> createState() => _RecordListState();
-}
-
-class _RecordListState extends State<RecordList> {
-  final _sales = List.generate(
+  final List<Sales> _sales = List.generate(
     300,
     (int index) => Sales(
       code: '${(index + 1).toString().padLeft(5, '0')}/KSR/TOKO/1026',
@@ -25,7 +21,14 @@ class _RecordListState extends State<RecordList> {
         Random().nextInt(59),
         0,
       ),
-      userName: 'Sella',
+      userName: [
+        'Sella',
+        'Oktaviani',
+        'Sisil',
+        'Ruth',
+        'Magdalena',
+        'Budi',
+      ].sample(1).first,
       total: Money(Random().nextInt(999) * 1_000.0),
       itemCount: Random().nextInt(99) + 9,
       description: [
@@ -139,23 +142,4 @@ class _RecordListState extends State<RecordList> {
       ],
     );
   }
-}
-
-class Sales {
-  String code;
-  DateTime transactionDate;
-  String? description;
-  Money total;
-  String userName;
-  bool isPaid;
-  int itemCount;
-  Sales({
-    required this.transactionDate,
-    required this.code,
-    this.description,
-    this.isPaid = false,
-    this.itemCount = 0,
-    required this.userName,
-    required this.total,
-  });
 }

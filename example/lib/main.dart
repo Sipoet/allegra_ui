@@ -17,7 +17,7 @@ class AllegraUI extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'iPos Ultimate Clone',
+      title: 'Allegra UI Example',
       theme: ThemeData(
         primarySwatch: Colors.green,
         scaffoldBackgroundColor: const Color.fromARGB(255, 240, 245, 243),

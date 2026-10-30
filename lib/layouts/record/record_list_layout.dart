@@ -1,10 +1,11 @@
+import 'package:allegra_ui/components/pagination_panel.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:allegra_ui/components/action_button.dart';
 import 'package:allegra_ui/components/desktop_table.dart';
 import 'package:allegra_ui/components/mobile_table.dart';
 import 'package:allegra_ui/models/custom_type.dart';
 import 'package:allegra_ui/models/table_definition.dart';
+
 export 'package:allegra_ui/models/table_definition.dart';
 export 'package:allegra_ui/components/action_button.dart';
 
@@ -18,6 +19,7 @@ class RecordListLayout<T> extends StatefulWidget {
   final List<Widget>? filterForm;
   final List<ActionButton>? footerActions;
   final List<ActionButton> Function(T model)? rowActions;
+  final void Function(FormState formState)? onFilterSubmit;
   const RecordListLayout({
     super.key,
     required this.columns,
@@ -25,6 +27,7 @@ class RecordListLayout<T> extends StatefulWidget {
     this.filterForm,
     this.rowActions,
     this.footerActions,
+    this.onFilterSubmit,
     this.showSearchText = true,
   });
 
@@ -68,8 +71,7 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
   final ValueNotifier<List<T>> _rows = ValueNotifier([]);
   CustomTableColumn? _firstColumn;
   final _pageInputController = TextEditingController(text: '1');
-  int itemCount = 0;
-  final Map<CustomTableColumn, List<FilterData>> _filters = {};
+  int? itemCount;
   final requestData = RequestData(page: 1, limit: 5, filters: [], sorts: []);
   int totalPage = 1;
   int currentPage = 1;
@@ -90,16 +92,14 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
             totalPage = responseData.totalPage ?? 1;
             currentPage = responseData.currentPage;
             _pageInputController.text = currentPage.format();
-            itemCount = responseData.itemCount ?? _rows.value.length;
+            itemCount = responseData.itemCount;
           }),
         );
   }
 
-  int get _startShowItems => (currentPage - 1) * requestData.limit + 1;
-  int get _endShowItems => currentPage * requestData.limit;
-
   @override
   void dispose() {
+    requestData.removeListener(_fetchData);
     requestData.dispose();
     super.dispose();
   }
@@ -108,7 +108,6 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraint) {
-        final colorScheme = ColorScheme.of(context);
         if (constraint.maxWidth >= 1024) {
           return Column(
             children: [
@@ -164,78 +163,10 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
                         ],
                       ),
                     const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const SizedBox(
-                          width: 80,
-                          child: Text(
-                            'Periode :',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 130,
-                          height: 28,
-                          child: TextField(
-                            // controller: _startDateController,
-                            readOnly: true,
-                            // onTap: () =>
-                            //     _selectDate(context, _startDateController),
-                            style: const TextStyle(fontSize: 12),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 0,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              suffixIcon: InkWell(
-                                // onTap: () => _selectDate(
-                                //   context,
-                                //   _startDateController,
-                                // ),
-                                child: const Icon(
-                                  Icons.calendar_today,
-                                  size: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: Text('s/d', style: TextStyle(fontSize: 12)),
-                        ),
-                        SizedBox(
-                          width: 130,
-                          height: 28,
-                          child: TextField(
-                            // controller: _endDateController,
-                            readOnly: true,
-                            // onTap: () =>
-                            //     _selectDate(context, _endDateController),
-                            style: const TextStyle(fontSize: 12),
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 0,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                              suffixIcon: InkWell(
-                                // onTap: () =>
-                                //     _selectDate(context, _endDateController),
-                                child: const Icon(
-                                  Icons.calendar_today,
-                                  size: 14,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    Wrap(
+                      spacing: 15,
+                      runSpacing: 10,
+                      children: widget.filterForm ?? [],
                     ),
                   ],
                 ),
@@ -246,192 +177,25 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
                   columns: widget.columns,
                   rows: _rows,
                   requestData: requestData,
+                  rowActions: widget.rowActions,
                 ),
               ),
-              Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: colorScheme.outlineVariant),
-                ),
-                child: Row(
-                  crossAxisAlignment: .center,
-                  children: [
-                    // Total Record Info
-                    Text(
-                      'Showing $_startShowItems–$_endShowItems of $itemCount records',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const Spacer(),
-
-                    // Rows per page selector (Limit)
-                    Text(
-                      'Rows per page:',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const .only(bottom: 20.0),
-                      child: SizedBox(
-                        height: 30,
-                        child: DropdownMenu<int>(
-                          width: 80,
-                          initialSelection: requestData.limit,
-                          dropdownMenuEntries: [5, 10, 25, 50, 100].map((
-                            limit,
-                          ) {
-                            return DropdownMenuEntry<int>(
-                              value: limit,
-                              label: '$limit',
-                            );
-                          }).toList(),
-                          onSelected: (newLimit) {
-                            if (newLimit != null) {
-                              setState(() {
-                                requestData.limit = newLimit;
-                              });
-                            }
-                          },
-                          inputDecorationTheme: InputDecorationTheme(
-                            labelStyle: TextStyle(fontSize: 12),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 30),
-
-                    // Pagination Action Buttons & Input
-                    Row(
-                      children: [
-                        // First Page Button
-                        IconButton(
-                          icon: const Icon(Icons.first_page, size: 18),
-                          onPressed: currentPage == 1
-                              ? null
-                              : () => requestData.page = 1,
-                          tooltip: 'First Page',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 30,
-                            minHeight: 30,
-                          ),
-                        ),
-                        // Previous Page Button
-                        IconButton(
-                          icon: const Icon(Icons.chevron_left, size: 18),
-                          onPressed: currentPage == 1
-                              ? null
-                              : () => requestData.page--,
-                          tooltip: 'Previous Page',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 30,
-                            minHeight: 30,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        Text(
-                          'Page of ',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-
-                        const SizedBox(width: 6),
-                        SizedBox(
-                          width: 42,
-                          height: 28,
-                          child: TextField(
-                            controller: _pageInputController,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            decoration: InputDecoration(
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 0,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            onSubmitted: (value) {
-                              final page = (int.tryParse(value) ?? 1).clamp(
-                                1,
-                                totalPage,
-                              );
-                              setState(() {
-                                _pageInputController.text = page.format();
-                                requestData.page = page;
-                              });
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        SizedBox(
-                          width: 70,
-                          child: Text(
-                            'of $totalPage',
-                            textAlign: .right,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-
-                        // Next Page Button
-                        IconButton(
-                          icon: const Icon(Icons.chevron_right, size: 18),
-                          onPressed: requestData.page == totalPage
-                              ? null
-                              : () => requestData.page++,
-                          tooltip: 'Next Page',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 30,
-                            minHeight: 30,
-                          ),
-                        ),
-                        // Last Page Button
-                        IconButton(
-                          icon: const Icon(Icons.last_page, size: 18),
-                          onPressed: requestData.page == totalPage
-                              ? null
-                              : () => requestData.page = totalPage,
-                          tooltip: 'Last Page',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 30,
-                            minHeight: 30,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              PaginationPanel(
+                currentPage: currentPage,
+                totalPage: totalPage,
+                limit: requestData.limit,
+                itemCount: itemCount,
+                onPageChanged: (page) {
+                  setState(() {
+                    requestData.page = page;
+                  });
+                },
+                onLimitChanged: (limit) {
+                  setState(() {
+                    requestData.limit = limit;
+                  });
+                },
               ),
-
               if (widget.footerActions != null)
                 Container(
                   height: 40,
@@ -509,8 +273,8 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
                             width: 45,
                             child: ActionButton(
                               onPressed: _showBottomFilterPanel,
-                              badgeText: _filters.keys.isNotEmpty
-                                  ? _filters.keys.length.format()
+                              badgeText: requestData.filters.isNotEmpty
+                                  ? requestData.filters.length.format()
                                   : null,
                               iconData: Icons.filter_list_alt,
                               label: 'Filter',
@@ -588,23 +352,13 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
                   rows: _rows.value,
                 ),
               ),
-              Container(
-                color: const Color(0xFFECEFF1),
-                padding: .symmetric(horizontal: 15, vertical: 7),
-                alignment: .topRight,
-                child: RichText(
-                  text: TextSpan(
-                    text: 'Total Ditemukan: ',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                    children: [
-                      TextSpan(
-                        text: itemCount.format(),
-                        style: TextStyle(color: Colors.black, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                  textAlign: .right,
-                ),
+              PaginationPanel(
+                currentPage: currentPage,
+                totalPage: totalPage,
+                limit: requestData.limit,
+                itemCount: itemCount,
+                onLimitChanged: (limit) => requestData.limit = limit,
+                onPageChanged: (page) => requestData.page = page,
               ),
               if (widget.footerActions != null)
                 Container(
@@ -635,6 +389,7 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
       elevation: 2,
       context: context,
       builder: (context) {
+        final formKey = GlobalKey<FormState>();
         final navigator = Navigator.of(context);
         return StatefulBuilder(
           builder: (context, setStateDialog) {
@@ -649,7 +404,12 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
                     padding: const EdgeInsets.symmetric(vertical: 5),
                     child: Divider(height: 2, color: Colors.grey.shade600),
                   ),
-                  Expanded(child: Column(children: [])),
+                  Expanded(
+                    child: Form(
+                      key: formKey,
+                      child: Column(children: widget.filterForm ?? []),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 5),
                     child: Divider(height: 2, color: Colors.grey.shade600),
@@ -658,9 +418,11 @@ class _RecordListLayoutState<T> extends State<RecordListLayout<T>> {
                     mainAxisAlignment: .spaceAround,
                     children: [
                       ActionButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          widget.onFilterSubmit?.call(formKey.currentState!);
+                        },
                         color: Colors.green,
-                        label: 'Submit',
+                        label: 'Filter',
                       ),
                       ActionButton(
                         onPressed: () {

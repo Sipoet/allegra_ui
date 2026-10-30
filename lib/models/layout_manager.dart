@@ -1,12 +1,13 @@
-import 'package:flutter/foundation.dart';
 import 'package:allegra_ui/models/tab_panel.dart';
+import 'package:flutter/material.dart';
 export 'package:allegra_ui/models/tab_panel.dart';
 
 class LayoutManager extends ChangeNotifier {
   late final List<TabPanel> _tabs;
+  Widget? floatingActionButton;
 
   int _selectedTabIndex = 0;
-  LayoutManager({List<TabPanel>? tabPanels})
+  LayoutManager({List<TabPanel>? tabPanels, this.floatingActionButton})
     : _tabs = tabPanels ?? <TabPanel>[];
 
   void showTab(int index) {

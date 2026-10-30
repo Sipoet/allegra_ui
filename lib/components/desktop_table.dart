@@ -7,11 +7,13 @@ import 'package:allegra_ui/models/table_definition.dart';
 class DesktopTable<T> extends StatefulWidget {
   final List<CustomTableColumn<T>> columns;
   final ValueNotifier<List<T>> rows;
+  final List<ActionButton> Function(T)? rowActions;
   final RequestData requestData;
   const DesktopTable({
     super.key,
     required this.columns,
     required this.rows,
+    this.rowActions,
     required this.requestData,
   });
 
@@ -28,19 +30,24 @@ class SortRule {
 
 class _DesktopTableState<T> extends State<DesktopTable<T>> {
   final Map<CustomTableColumn<T>, double> _colsWidth = {};
-
+  final _scrollVertController = ScrollController();
+  final _scrollHorController = ScrollController();
   final Map<CustomTableColumn<T>, SortRule> _sortMap = {};
 
-  late final List<CustomTableColumn<T>> _columns;
+  late List<CustomTableColumn<T>> _columns;
+  bool showScroll = false;
 
   @override
   void initState() {
-    _columns = widget.columns;
+    _columns = widget.columns.toList();
     for (var column in _columns) {
       _colsWidth[column] = 200.0;
     }
     widget.rows.addListener(_refreshRow);
     super.initState();
+    _scrollHorController.addListener(() {
+      setState(() {});
+    });
   }
 
   void _refreshRow() {
@@ -50,6 +57,8 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
   @override
   void dispose() {
     widget.rows.removeListener(_refreshRow);
+    _scrollHorController.dispose();
+    _scrollVertController.dispose();
     super.dispose();
   }
 
@@ -103,14 +112,20 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
   }
 
   void _showHideColumnDialog() {
-    showDialog<Map<CustomTableColumn<T>, bool?>>(
+    showDialog<List<CustomTableColumn<T>>>(
       context: context,
       builder: (context) {
         final navigator = Navigator.of(context);
         final textTheme = TextTheme.of(context);
+        final newColumns = _columns.toList();
         final Map<CustomTableColumn<T>, bool?> checkboxValues = {};
-        for (var column in _columns) {
+        for (final column in _columns) {
           checkboxValues[column] = true;
+        }
+        for (final column in widget.columns) {
+          if (checkboxValues[column] != true) {
+            newColumns.add(column);
+          }
         }
         return StatefulBuilder(
           builder: (context, setStateDialog) {
@@ -121,7 +136,7 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
                 children: [
                   Flexible(
                     child: Text(
-                      'Show/Hide Dialog',
+                      'Tampil/Sembunyi & Urutkan Kolom',
                       style: textTheme.titleMedium,
                     ),
                   ),
@@ -133,21 +148,44 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
               ),
               content: SizedBox(
                 width: 400,
-                child: ListView(
+                child: ReorderableListView.builder(
                   scrollDirection: .vertical,
-                  children: widget.columns
-                      .map<Widget>(
-                        (column) => CheckboxListTile(
-                          title: Text(column.title),
-                          value: checkboxValues[column] == true,
-                          onChanged: (value) {
-                            setStateDialog(() {
-                              checkboxValues[column] = value;
-                            });
-                          },
-                        ),
-                      )
-                      .toList(),
+                  onReorder: (oldIndex, newIndex) {
+                    if (oldIndex == newIndex) {
+                      return;
+                    }
+                    final columnContainer = newColumns[oldIndex];
+                    setStateDialog(() {
+                      newColumns.removeAt(oldIndex);
+                      newColumns.insert(
+                        oldIndex > newIndex ? newIndex : newIndex - 1,
+                        columnContainer,
+                      );
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    final column = newColumns[index];
+                    return CheckboxListTile(
+                      key: ValueKey(column.title),
+                      title: Text(column.title),
+                      tileColor: Colors.white,
+                      shape: index == 0
+                          ? BoxBorder.all(color: Colors.grey.shade300)
+                          : BoxBorder.fromLTRB(
+                              left: BorderSide(color: Colors.grey.shade300),
+                              right: BorderSide(color: Colors.grey.shade300),
+                              bottom: BorderSide(color: Colors.grey.shade300),
+                            ),
+                      controlAffinity: .leading,
+                      value: checkboxValues[column] == true,
+                      onChanged: (value) {
+                        setStateDialog(() {
+                          checkboxValues[column] = value;
+                        });
+                      },
+                    );
+                  },
+                  itemCount: newColumns.length,
                 ),
               ),
               actions: [
@@ -156,10 +194,14 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
                   height: 30,
                   child: ActionButton(
                     onPressed: () {
-                      navigator.pop(checkboxValues);
+                      navigator.pop(
+                        newColumns
+                            .where((column) => checkboxValues[column] == true)
+                            .toList(),
+                      );
                     },
                     color: Colors.black,
-                    label: 'Submit',
+                    label: 'Urutkan',
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -171,7 +213,7 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
                       navigator.pop();
                     },
                     color: Colors.black,
-                    label: 'Cancel',
+                    label: 'Batalkan',
                   ),
                 ),
               ],
@@ -179,70 +221,87 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
           },
         );
       },
-    ).then((showColumnMap) {
-      if (showColumnMap == null) {
+    ).then((newColumns) {
+      if (newColumns == null) {
         return;
       }
-      for (var column in _columns) {
-        if (showColumnMap[column] != true) {
-          _columns.remove(column);
-        }
-        showColumnMap.remove(column);
-      }
-
-      _columns.addAll(
-        showColumnMap.entries
-            .where((entry) => entry.value == true)
-            .map<CustomTableColumn<T>>((entry) => entry.key),
-      );
+      setState(() {
+        _columns.clear();
+        _columns.addAll(newColumns);
+      });
     });
   }
 
+  Widget get menuTable => Container(
+    height: 44,
+    decoration: BoxDecoration(
+      border: Border(
+        top: BorderSide(color: Colors.grey.shade300),
+        left: BorderSide(color: Colors.grey.shade300),
+        right: BorderSide(color: Colors.grey.shade300),
+      ),
+      borderRadius: BorderRadius.only(topLeft: Radius.circular(8)),
+      color: Colors.grey.shade100,
+    ),
+
+    child: MenuAnchor(
+      controller: _menuTableController,
+      menuChildren: [
+        MenuItemButton(
+          leadingIcon: Icon(Icons.help),
+          onPressed: () {},
+          child: Tooltip(
+            message:
+                '• Reorder: Drag any column header horizontally to reorder positions.\n'
+                '• Resize: Drag the right edge of any header to change column width.\n'
+                '• Sort: Click header to sort. Hold SHIFT + Click for multi-column sorting.',
+            textStyle: TextStyle(fontSize: 12, color: Colors.black),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            padding: .all(10),
+            child: Text('Help'),
+          ),
+        ),
+        MenuItemButton(
+          onPressed: _showHideColumnDialog,
+          child: Text('Tampil/Sembunyi & Urutkan Kolom'),
+        ),
+      ],
+      child: IconButton(
+        onPressed: () => setState(() {
+          _menuTableController.isOpen
+              ? _menuTableController.close()
+              : _menuTableController.open();
+        }),
+        icon: Icon(Icons.menu),
+      ),
+    ),
+  );
+
+  final double _rowActionColWidth = 45;
+  final _menuTableController = MenuController();
   @override
   Widget build(BuildContext context) {
-    double totalWidth = _colsWidth.values.reduce(
-      (widthA, widthB) => widthA + widthB,
-    );
+    double totalWidth =
+        _colsWidth.values.reduce((widthA, widthB) => widthA + widthB) +
+        _rowActionColWidth +
+        2;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Container(
-            height: 40,
-            color: Colors.white,
-            padding: .symmetric(horizontal: 5),
-            child: Row(
-              spacing: 15,
-              mainAxisAlignment: .end,
-              children: [
-                Tooltip(
-                  message:
-                      '• Reorder: Drag any column header horizontally to reorder positions.\n'
-                      '• Resize: Drag the right edge of any header to change column width.\n'
-                      '• Sort: Click header to sort. Hold SHIFT + Click for multi-column sorting.',
-                  textStyle: TextStyle(fontSize: 12, color: Colors.black),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  padding: .all(10),
-                  child: Icon(Icons.help),
-                ),
-                ActionButton(
-                  onPressed: _showHideColumnDialog,
-                  label: 'Show/Hide Column',
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, thickness: 1, color: Colors.grey),
-          // Main Table Container
-          Expanded(
-            child: Container(
+      child: MouseRegion(
+        onEnter: (event) => setState(() {
+          showScroll = true;
+        }),
+        onExit: (event) => setState(() {
+          showScroll = false;
+        }),
+        child: Stack(
+          children: [
+            Container(
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade300),
                 borderRadius: BorderRadius.circular(8),
@@ -250,251 +309,367 @@ class _DesktopTableState<T> extends State<DesktopTable<T>> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: totalWidth,
-                    child: Column(
-                      children: [
-                        // 1. Table HEAD
-                        Container(
-                          height: 44,
-                          color: Colors.grey.shade100,
-                          child: Row(
-                            children: List.generate(widget.columns.length, (
-                              index,
-                            ) {
-                              final column = widget.columns[index];
-                              final sortRuleIndex = widget.requestData.sorts
-                                  .indexWhere(
-                                    (sortData) => sortData.column == column,
-                                  );
-                              final isSorted = _sortMap[column] != null;
-                              return DragTarget<int>(
-                                onAcceptWithDetails: (oldIndex) {
-                                  _reorderColumns(oldIndex.data, index);
-                                },
-                                builder: (context, candidateData, rejectedData) {
-                                  return LongPressDraggable<int>(
-                                    data: index,
-                                    feedback: Material(
-                                      elevation: 4,
-                                      child: Container(
-                                        width: _colsWidth[column],
-                                        height: 44,
-                                        color: Colors.blue.shade100,
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          column.title,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
+                child: Scrollbar(
+                  thumbVisibility: showScroll,
+                  trackVisibility: showScroll,
+                  interactive: true,
+                  controller: _scrollHorController,
+                  child: SingleChildScrollView(
+                    controller: _scrollHorController,
+                    scrollDirection: Axis.horizontal,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: SizedBox(
+                        width: totalWidth,
+                        child: Column(
+                          children: [
+                            // 1. Table HEAD
+                            Container(
+                              height: 44,
+                              color: Colors.grey.shade100,
+                              child: Row(
+                                children: List.generate(_columns.length, (
+                                  index,
+                                ) {
+                                  final column = _columns[index];
+                                  final sortRuleIndex = widget.requestData.sorts
+                                      .indexWhere(
+                                        (sortData) => sortData.column == column,
+                                      );
+                                  final isSorted = _sortMap[column] != null;
+                                  return DragTarget<int>(
+                                    onAcceptWithDetails: (oldIndex) {
+                                      _reorderColumns(oldIndex.data, index);
+                                    },
+                                    builder: (context, candidateData, rejectedData) {
+                                      return LongPressDraggable<int>(
+                                        data: index,
+                                        feedback: Material(
+                                          elevation: 4,
+                                          child: Container(
+                                            width: _colsWidth[column],
+                                            height: 44,
+                                            color: Colors.blue.shade100,
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              column.title,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    child: SizedBox(
-                                      width: _colsWidth[column],
-                                      child: Stack(
-                                        children: [
-                                          Positioned.fill(
-                                            child: Material(
-                                              color: candidateData.isNotEmpty
-                                                  ? Colors.blue.shade50
-                                                  : Colors.transparent,
-                                              child: InkWell(
-                                                onTapDown: (details) {
-                                                  final isShift =
-                                                      HardwareKeyboard
-                                                          .instance
-                                                          .isShiftPressed;
-                                                  _onHeaderTap(column, isShift);
-                                                },
-                                                child: Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 10,
-                                                      ),
-                                                  child: Row(
-                                                    mainAxisAlignment:
-                                                        column
-                                                            .columnType
-                                                            .isNumeric
-                                                        ? .end
-                                                        : .start,
-                                                    children: [
-                                                      Icon(
-                                                        Icons.drag_indicator,
-                                                        size: 14,
-                                                        color: Colors
-                                                            .grey
-                                                            .shade400,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Flexible(
-                                                        child: Tooltip(
-                                                          message: column.title,
-                                                          child: Text(
-                                                            column.title,
+                                        child: SizedBox(
+                                          width: _colsWidth[column],
+                                          child: Stack(
+                                            children: [
+                                              Positioned.fill(
+                                                child: Material(
+                                                  color:
+                                                      candidateData.isNotEmpty
+                                                      ? Colors.blue.shade50
+                                                      : Colors.transparent,
+                                                  child: InkWell(
+                                                    onTapDown: (details) {
+                                                      final isShift =
+                                                          HardwareKeyboard
+                                                              .instance
+                                                              .isShiftPressed;
+                                                      _onHeaderTap(
+                                                        column,
+                                                        isShift,
+                                                      );
+                                                    },
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 10,
+                                                          ),
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            column
+                                                                .columnType
+                                                                .isNumeric
+                                                            ? .end
+                                                            : .start,
+                                                        children: [
+                                                          Icon(
+                                                            Icons
+                                                                .drag_indicator,
+                                                            size: 14,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade400,
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
+                                                          Flexible(
+                                                            child: Tooltip(
+                                                              message:
+                                                                  column.title,
+                                                              child: Text(
+                                                                column.title,
 
-                                                            style:
-                                                                const TextStyle(
+                                                                style: const TextStyle(
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .bold,
                                                                   fontSize: 13,
                                                                 ),
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      if (isSorted) ...[
-                                                        const SizedBox(
-                                                          width: 4,
-                                                        ),
-                                                        Icon(
-                                                          _sortMap[column]!
-                                                                  .isAscending
-                                                              ? Icons
-                                                                    .arrow_upward
-                                                              : Icons
-                                                                    .arrow_downward,
-                                                          size: 14,
-                                                          color: Colors
-                                                              .blue
-                                                              .shade700,
-                                                        ),
-                                                        if (_sortMap
-                                                                .keys
-                                                                .length >
-                                                            1)
-                                                          Text(
-                                                            '${sortRuleIndex + 1}',
-                                                            style: TextStyle(
-                                                              fontSize: 10,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .bold,
-                                                              color: Colors
-                                                                  .blue
-                                                                  .shade900,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
                                                             ),
                                                           ),
-                                                      ],
-                                                    ],
+                                                          if (isSorted) ...[
+                                                            const SizedBox(
+                                                              width: 4,
+                                                            ),
+                                                            Icon(
+                                                              _sortMap[column]!
+                                                                      .isAscending
+                                                                  ? Icons
+                                                                        .arrow_upward
+                                                                  : Icons
+                                                                        .arrow_downward,
+                                                              size: 14,
+                                                              color: Colors
+                                                                  .blue
+                                                                  .shade700,
+                                                            ),
+                                                            if (_sortMap
+                                                                    .keys
+                                                                    .length >
+                                                                1)
+                                                              Text(
+                                                                '${sortRuleIndex + 1}',
+                                                                style: TextStyle(
+                                                                  fontSize: 10,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                  color: Colors
+                                                                      .blue
+                                                                      .shade900,
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
+                                              // --- FEATURE: RESIZABLE COLUMN HANDLE ---
+                                              Positioned(
+                                                right: 0,
+                                                top: 0,
+                                                bottom: 0,
+                                                width: 6,
+                                                child: MouseRegion(
+                                                  cursor: SystemMouseCursors
+                                                      .resizeColumn,
+                                                  child: GestureDetector(
+                                                    behavior: HitTestBehavior
+                                                        .translucent,
+                                                    onPanUpdate: (details) {
+                                                      setState(() {
+                                                        _colsWidth[column] =
+                                                            (_colsWidth[column]! +
+                                                                    details
+                                                                        .delta
+                                                                        .dx)
+                                                                .clamp(
+                                                                  50.0,
+                                                                  400.0,
+                                                                );
+                                                      });
+                                                    },
+                                                    child: Container(
+                                                      color: Colors.transparent,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          // --- FEATURE: RESIZABLE COLUMN HANDLE ---
+                                        ),
+                                      );
+                                    },
+                                  );
+                                })..insert(0, SizedBox(width: _rowActionColWidth)),
+                              ),
+                            ),
+                            const Divider(
+                              height: 1,
+                              thickness: 1,
+                              color: Colors.grey,
+                            ),
+
+                            // 2. BODY ROWS
+                            Expanded(
+                              child: Scrollbar(
+                                thumbVisibility: showScroll,
+                                trackVisibility: showScroll,
+                                interactive: true,
+                                controller: _scrollVertController,
+                                child: ListView.builder(
+                                  controller: _scrollVertController,
+                                  itemCount: widget.rows.value.length,
+                                  itemBuilder: (context, rowIndex) {
+                                    final row = widget.rows.value[rowIndex];
+                                    final menuController = MenuController();
+                                    return Container(
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        border: Border(
+                                          bottom: BorderSide(
+                                            color: Colors.grey.shade200,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        color: rowIndex.isEven
+                                            ? Colors.white
+                                            : Colors.grey.shade50.withValues(
+                                                alpha: 0.5,
+                                              ),
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          Row(
+                                            children:
+                                                List.generate(_columns.length, (
+                                                  visualColIndex,
+                                                ) {
+                                                  final col =
+                                                      _columns[visualColIndex];
+                                                  final cellValue = col
+                                                      .decoratedValue(row);
+
+                                                  // --- FEATURE: TEXT ALIGNMENT PER COLUMN ---
+                                                  return SizedBox(
+                                                    width: _colsWidth[col],
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 10,
+                                                          ),
+                                                      child: Align(
+                                                        alignment:
+                                                            col
+                                                                .columnType
+                                                                .isNumeric
+                                                            ? .topRight
+                                                            : .topLeft,
+                                                        child: Text(
+                                                          cellValue.toString(),
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 13,
+                                                                color: Colors
+                                                                    .black87,
+                                                              ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                })..insert(
+                                                  0,
+                                                  SizedBox(
+                                                    width: _rowActionColWidth,
+                                                  ),
+                                                ),
+                                          ),
                                           Positioned(
-                                            right: 0,
-                                            top: 0,
-                                            bottom: 0,
-                                            width: 6,
-                                            child: MouseRegion(
-                                              cursor: SystemMouseCursors
-                                                  .resizeColumn,
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.translucent,
-                                                onPanUpdate: (details) {
-                                                  setState(() {
-                                                    _colsWidth[column] =
-                                                        (_colsWidth[column]! +
-                                                                details
-                                                                    .delta
-                                                                    .dx)
-                                                            .clamp(50.0, 400.0);
-                                                  });
-                                                },
-                                                child: Container(
-                                                  color: Colors.transparent,
+                                            left: _scrollHorController.offset,
+                                            width: _rowActionColWidth,
+                                            height: 40,
+                                            child: Container(
+                                              decoration: BoxDecoration(
+                                                border: BoxBorder.fromLTRB(
+                                                  right: BorderSide(
+                                                    color: Colors.grey.shade200,
+                                                  ),
+                                                ),
+                                                color: rowIndex.isEven
+                                                    ? Colors.white
+                                                    : Colors.grey.shade50,
+                                              ),
+                                              child: MenuAnchor(
+                                                controller: menuController,
+                                                menuChildren:
+                                                    widget.rowActions
+                                                        ?.call(row)
+                                                        .map<MenuItemButton>(
+                                                          (
+                                                            actionButton,
+                                                          ) => MenuItemButton(
+                                                            key: ValueKey(
+                                                              actionButton
+                                                                  .label,
+                                                            ),
+                                                            leadingIcon: Icon(
+                                                              actionButton
+                                                                  .iconData,
+                                                              color:
+                                                                  actionButton
+                                                                      .color,
+                                                            ),
+                                                            onPressed:
+                                                                actionButton
+                                                                    .onPressed,
+                                                            child: Text(
+                                                              actionButton
+                                                                  .label,
+                                                            ),
+                                                          ),
+                                                        )
+                                                        .toList() ??
+                                                    [],
+                                                child: IconButton(
+                                                  onPressed:
+                                                      widget.rowActions == null
+                                                      ? null
+                                                      : () {
+                                                          menuController.isOpen
+                                                              ? menuController
+                                                                    .close()
+                                                              : menuController
+                                                                    .open();
+                                                        },
+                                                  icon: Icon(Icons.more_vert),
                                                 ),
                                               ),
                                             ),
                                           ),
                                         ],
                                       ),
-                                    ),
-                                  );
-                                },
-                              );
-                            }),
-                          ),
-                        ),
-                        const Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: Colors.grey,
-                        ),
-
-                        // 2. BODY ROWS
-                        Expanded(
-                          child: ListView.builder(
-                            itemCount: widget.rows.value.length,
-                            itemBuilder: (context, rowIndex) {
-                              final row = widget.rows.value[rowIndex];
-                              return Container(
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Colors.grey.shade200,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  color: rowIndex.isEven
-                                      ? Colors.white
-                                      : Colors.grey.shade50.withValues(
-                                          alpha: 0.5,
-                                        ),
-                                ),
-                                child: Row(
-                                  children: List.generate(_columns.length, (
-                                    visualColIndex,
-                                  ) {
-                                    final col = _columns[visualColIndex];
-                                    final cellValue = col.decoratedValue(row);
-
-                                    // --- FEATURE: TEXT ALIGNMENT PER COLUMN ---
-                                    return SizedBox(
-                                      width: _colsWidth[col],
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                        ),
-                                        child: Align(
-                                          alignment: col.columnType.isNumeric
-                                              ? .topRight
-                                              : .topLeft,
-                                          child: Text(
-                                            cellValue.toString(),
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              color: Colors.black87,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ),
                                     );
-                                  }),
+                                  },
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+            Positioned(
+              left: 0,
+              top: 0,
+              height: 44,
+              width: _rowActionColWidth,
+              child: menuTable,
+            ),
+          ],
+        ),
       ),
     );
   }

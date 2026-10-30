@@ -1,3 +1,4 @@
+import 'package:allegra_ui/layouts/record/sales_detail_layout.dart';
 import 'package:flutter/material.dart';
 
 class CashierDetail extends StatefulWidget {
@@ -10,6 +11,6 @@ class CashierDetail extends StatefulWidget {
 class _CashierDetailState extends State<CashierDetail> {
   @override
   Widget build(BuildContext context) {
-    return const Placeholder();
+    return const SalesDetailLayout();
   }
 }

@@ -176,6 +176,8 @@ class _MobileBaseLayoutState extends State<MobileBaseLayout>
           Expanded(child: layoutManager.selectedTab?.page ?? const SizedBox()),
         ],
       ),
+      floatingActionButton: layoutManager.floatingActionButton,
+      floatingActionButtonLocation: .centerFloat,
     );
   }
 }

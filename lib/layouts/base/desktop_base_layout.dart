@@ -12,7 +12,7 @@ class DesktopBaseLayout extends StatefulWidget {
 }
 
 class _DesktopBaseLayoutState extends State<DesktopBaseLayout> {
-  int _selectedMainMenuIndex = 0;
+  int _selectedMainMenuIndex = -1;
   String _activeSubMenu = 'Menu Utama';
 
   // final List<TabPanel> _tabs = [
@@ -56,7 +56,11 @@ class _DesktopBaseLayoutState extends State<DesktopBaseLayout> {
                 return InkWell(
                   onTap: () {
                     setState(() {
-                      _selectedMainMenuIndex = index;
+                      if (isSelected) {
+                        _selectedMainMenuIndex = -1;
+                      } else {
+                        _selectedMainMenuIndex = index;
+                      }
                     });
                   },
                   child: Container(
@@ -90,79 +94,74 @@ class _DesktopBaseLayoutState extends State<DesktopBaseLayout> {
           const Divider(height: 1, color: Colors.grey),
 
           // 2. SUB MENU TOOLBAR (Clickable)
-          Container(
-            height: 75,
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: widget.menus[_selectedMainMenuIndex].submenus.length,
-              itemBuilder: (context, index) {
-                final subMenus = widget.menus[_selectedMainMenuIndex].submenus;
-                final subMenu = subMenus[index];
-                final isSubMenuSelected = _activeSubMenu == subMenu.title;
+          if (_selectedMainMenuIndex != -1)
+            Container(
+              height: 75,
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: widget.menus[_selectedMainMenuIndex].submenus.length,
+                itemBuilder: (context, index) {
+                  final subMenus =
+                      widget.menus[_selectedMainMenuIndex].submenus;
+                  final subMenu = subMenus[index];
+                  final isSubMenuSelected = _activeSubMenu == subMenu.title;
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 4,
-                  ),
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _activeSubMenu = subMenu.title;
-                        int tabIndex = layoutManager.addTab(
-                          TabPanel(title: subMenu.title, page: subMenu.page!),
-                        );
-                        layoutManager.showTab(tabIndex);
-                      });
-
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Clicked Sub Menu: ${subMenu.title}'),
-                          duration: const Duration(milliseconds: 500),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 75,
-                      decoration: BoxDecoration(
-                        color: isSubMenuSelected
-                            ? Colors.green.shade50
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _activeSubMenu = subMenu.title;
+                          int tabIndex = layoutManager.addTab(
+                            TabPanel(title: subMenu.title, page: subMenu.page!),
+                          );
+                          layoutManager.showTab(tabIndex);
+                        });
+                      },
+                      child: Container(
+                        width: 75,
+                        decoration: BoxDecoration(
                           color: isSubMenuSelected
-                              ? Colors.green.shade200
+                              ? Colors.green.shade50
                               : Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: isSubMenuSelected
+                                ? Colors.green.shade200
+                                : Colors.transparent,
+                          ),
                         ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Icon(
-                            subMenu.iconData,
-                            size: 24,
-                            color: Colors.green.shade700,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            subMenu.title,
-                            style: const TextStyle(fontSize: 10),
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            softWrap: true,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              subMenu.iconData,
+                              size: 24,
+                              color: Colors.green.shade700,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subMenu.title,
+                              style: const TextStyle(fontSize: 10),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              softWrap: true,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
-          ),
           const Divider(height: 1, color: Colors.grey),
 
           // 3. TAB NAVIGATION BAR (Clickable Tabs)

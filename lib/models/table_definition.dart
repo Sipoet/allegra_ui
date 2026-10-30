@@ -245,7 +245,7 @@ class RequestData extends ChangeNotifier {
   }
 
   void resetPage() {
-    page = 1;
+    _page = 1;
     notifyListeners();
   }
 
